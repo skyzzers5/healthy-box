@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  POLICE DU LOGO — Oilvare Base
+  ------------------------------------------------------------------
+  Oilvare Base est une police commerciale (Adam Ladd). Elle n'est pas
+  fournie ici. Pour l'activer :
+    1. acheter la licence WEBFONT sur fontspring.com ou myfonts.com
+    2. déposer le fichier dans public/fonts/OilvareBase-Regular.woff2
+    3. décommenter le bloc ci-dessous
+  En attendant, le logo utilise DM Sans en graisse forte et interlettré.
+
+@font-face {
+  font-family: "Oilvare Base";
+  src: url("/fonts/OilvareBase-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+*/
+:root {
+  /* Bascule sur "Oilvare Base" une fois la police installée */
+  --font-logo: var(--font-dm-sans);
+}
+
+@layer base {
+  body {
+    @apply bg-creme text-ardoise antialiased;
+  }
+  h1, h2, h3 {
+    @apply font-sans font-bold text-framboise;
+  }
+  a:focus-visible,
+  button:focus-visible,
+  select:focus-visible,
+  input:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 3px solid #C2184B;
+    outline-offset: 3px;
+    border-radius: 8px;
+  }
+}
+
+@layer components {
+  /* Logo « Healthy Box » : capitales interlettrées, comme sur les stories */
+  .logo-marque {
+    @apply font-logo font-bold uppercase tracking-[0.18em] text-framboise;
+  }
+
+  /* Accent manuscrit : « sans avoir à tout organiser » */
+  .accent-script {
+    @apply font-script text-encre;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-framboise
+           px-7 py-3 font-semibold text-white transition-colors
+           hover:bg-framboise-dark disabled:cursor-not-allowed disabled:opacity-45
+           disabled:hover:bg-framboise;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border-2
+           border-framboise px-6 py-2.5 font-semibold text-framboise
+           transition-colors hover:bg-framboise hover:text-white
+           disabled:cursor-not-allowed disabled:opacity-45;
+  }
+  .carte {
+    @apply overflow-hidden rounded-2xl border border-black/[0.07] bg-white
+           shadow-[0_2px_16px_rgba(34,38,31,0.05)];
+  }
+  .field-label { @apply mb-2 block text-sm font-semibold text-encre; }
+  .field-input {
+    @apply w-full rounded-xl border-2 border-black/15 bg-white px-4 py-3
+           focus:border-framboise;
+  }
+  .eyebrow {
+    @apply mb-3 text-sm font-bold uppercase tracking-[0.15em] text-framboise;
+  }
+  /* Pastille ronde pastel des pictogrammes */
+  .pastille {
+    @apply flex h-16 w-16 items-center justify-center rounded-full;
+  }
+  .sr-only-focusable {
+    @apply absolute left-[-9999px] top-0 z-[100] rounded-br-lg bg-framboise
+           px-6 py-3.5 font-semibold text-white focus:left-0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

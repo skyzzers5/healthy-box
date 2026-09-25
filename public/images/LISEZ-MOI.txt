@@ -1,0 +1,21 @@
+Ces images proviennent des photos fournies par le porteur du projet.
+Pour les remplacer, gardez EXACTEMENT les mêmes noms de fichier :
+
+  box-diabete.jpg             carte de la box diabète (portrait 3/4)
+  box-antiinflam.jpg          carte de la box anti-inflammatoire (portrait 3/4)
+  hero.jpg                    bandeau vert foncé de l'accueil (paysage 4/3)
+  box-diabete-vignette.jpg    vignette du configurateur (paysage 4/3)
+  box-antiinflam-vignette.jpg vignette du configurateur (paysage 4/3)
+
+Les vignettes sont des versions recadrées en paysage des mêmes plats : si
+vous changez une photo de box, pensez à régénérer la vignette correspondante.
+
+Conseils techniques :
+- Moins de 400 Ko par fichier. Compressez sur squoosh.app ou tinypng.com.
+- JPEG plutôt que PNG pour des photos.
+- Composez avec le sujet au centre : les vignettes sont recadrées au centre.
+
+Si vous changez les noms de fichier, modifiez aussi lib/pricing.js
+(champs "image" et "thumbnail") et app/page.js.
+
+N'utilisez que des photos dont vous détenez les droits.
