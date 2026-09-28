@@ -105,10 +105,16 @@ create index if not exists idx_variants_recipe on recipe_variants(recipe_id);
 --    NOTE RGPD : on ne stocke AUCUNE donnée médicale ici.
 --    La catégorie de box est une préférence de menu, pas un diagnostic.
 -- ---------------------------------------------------------------------
+create type user_role as enum ('client', 'admin');
+
 create table if not exists profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
   full_name   text,
   phone       text,
+  -- Le rôle ne peut PAS être modifié depuis le navigateur : la politique
+  -- de mise à jour ci-dessous l'interdit. On se nomme administrateur
+  -- uniquement depuis l'éditeur SQL de Supabase.
+  role        user_role not null default 'client',
   created_at  timestamptz not null default now()
 );
 
@@ -172,6 +178,12 @@ create table if not exists subscriptions (
   contact_phone          text,
   -- consigne des contenants : facturée une seule fois, à la première commande
   deposit_paid           boolean not null default false,
+  -- code promo appliqué à cet abonnement, le cas échéant.
+  -- La clé étrangère est ajoutée plus bas, promo_codes étant créée après.
+  promo_code_id          bigint,
+  free_delivery          boolean not null default false,
+  -- date d'envoi de la relance de panier abandonné (une seule par abonnement)
+  abandoned_email_at     timestamptz,
   deposit_amount_cents   int not null default 0,
   status                 subscription_status not null default 'incomplete',
   -- Stripe
@@ -220,6 +232,51 @@ alter table orders add constraint orders_unique_per_date
 -- ---------------------------------------------------------------------
 
 -- ---------------------------------------------------------------------
+-- 7 bis. CODES PROMO
+--    Pour l'instant un seul effet : offrir les frais de livraison.
+--    Le code est toujours revalidé côté serveur avant le paiement.
+-- ---------------------------------------------------------------------
+create type promo_effect as enum ('livraison_offerte');
+
+create table if not exists promo_codes (
+  id           bigint generated always as identity primary key,
+  -- toujours stocké en MAJUSCULES, la comparaison se fait dessus
+  code         text not null unique,
+  effect       promo_effect not null default 'livraison_offerte',
+  active       boolean not null default true,
+  -- null = pas de limite
+  max_uses     int,
+  used_count   int not null default 0,
+  expires_at   timestamptz,
+  note         text,
+  created_at   timestamptz not null default now()
+);
+
+-- Incrémentation atomique du compteur : deux paiements simultanés ne doivent
+-- pas lire la même valeur et écrire le même total.
+create or replace function increment_promo_usage(promo_id bigint)
+returns void language sql security definer set search_path = public as $$
+  update promo_codes set used_count = used_count + 1 where id = promo_id;
+$$;
+
+-- La contrainte ne peut être posée qu'ici : subscriptions est déclarée plus haut
+alter table subscriptions
+  drop constraint if exists subscriptions_promo_code_fk;
+alter table subscriptions
+  add constraint subscriptions_promo_code_fk
+  foreign key (promo_code_id) references promo_codes(id) on delete set null;
+
+-- Qui a utilisé quel code : évite qu'une même personne en profite deux fois
+create table if not exists promo_redemptions (
+  id              bigint generated always as identity primary key,
+  promo_code_id   bigint not null references promo_codes(id) on delete cascade,
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  subscription_id bigint references subscriptions(id) on delete set null,
+  created_at      timestamptz not null default now(),
+  unique (promo_code_id, user_id)
+);
+
+-- ---------------------------------------------------------------------
 -- 8. LISTE D'ATTENTE (communes non desservies)
 --    Sert à savoir où étendre les tournées.
 -- ---------------------------------------------------------------------
@@ -248,6 +305,15 @@ alter table delivery_addresses  enable row level security;
 alter table subscriptions       enable row level security;
 alter table orders              enable row level security;
 alter table waitlist            enable row level security;
+alter table promo_codes         enable row level security;
+alter table promo_redemptions   enable row level security;
+
+-- Aucune politique de lecture sur promo_codes : la liste des codes ne doit
+-- jamais être accessible au navigateur. Seul le serveur (service_role) y
+-- accède, ce qui contourne RLS.
+
+create policy "utilisations lisibles par leur propriétaire"
+  on promo_redemptions for select using (auth.uid() = user_id);
 
 -- Liste d'attente : tout le monde peut s'inscrire, personne ne peut la lire
 -- depuis le navigateur (seul le back-office y accède via service_role).
@@ -272,8 +338,15 @@ create policy "variantes lisibles publiquement"
 -- Profil : chacun ne voit et ne modifie que le sien
 create policy "profil lisible par son propriétaire"
   on profiles for select using (auth.uid() = id);
+-- Mise à jour de son propre profil, sans pouvoir changer son rôle :
+-- sans ce contrôle, n'importe quel client se déclarerait administrateur.
 create policy "profil modifiable par son propriétaire"
-  on profiles for update using (auth.uid() = id);
+  on profiles for update
+  using (auth.uid() = id)
+  with check (
+    auth.uid() = id
+    and role = (select p.role from profiles p where p.id = auth.uid())
+  );
 
 -- Adresses
 create policy "adresses lisibles par leur propriétaire"
@@ -327,6 +400,10 @@ insert into delivery_postal_codes (postal_code, label, zone_id) values
   -- Calcatoggio
   ('20111', 'Calcatoggio',                          (select id from delivery_zones where city = 'Calcatoggio'))
 on conflict (postal_code) do nothing;
+
+insert into promo_codes (code, effect, note, max_uses) values
+  ('LIVRAISONOFFERTE', 'livraison_offerte', 'Code de lancement, à distribuer manuellement', 100)
+on conflict (code) do nothing;
 
 insert into recipes (slug, name, description, image, image_alt, prep_minutes, tags, validated_by, validated_at, published, position) values
   ('champignons-farcis', 'Champignons farcis au chèvre, mâche et noix', 'Gros champignons de Paris garnis d''épinards et de noix, chèvre gratiné, mâche au balsamique.', '/images/recettes/champignons-farcis.jpg', 'Trois champignons farcis au chèvre gratiné, servis avec une mâche aux noix et au balsamique', 35, '{"végétarien"}'::text[], 'Naturopathe — à renseigner', now(), true, 1),

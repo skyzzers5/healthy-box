@@ -15,6 +15,7 @@ import { formatCreneau, dayLabel, formatLongDate } from "@/lib/delivery";
 import EtapeLivraison from "@/components/EtapeLivraison";
 import EtapeRecettes from "@/components/EtapeRecettes";
 import Coche from "@/components/Coche";
+import ChampCodePromo from "@/components/ChampCodePromo";
 
 export default function Configurateur({
   zones,
@@ -48,6 +49,10 @@ export default function Configurateur({
   // 5 — recettes choisies : tableau d'identifiants, répétitions autorisées
   const [recipeIds, setRecipeIds] = useState([]);
 
+  const [promo, setPromo] = useState(null);
+  // Récapitulatif replié par défaut sur mobile : déplié il occupait tout l'écran
+  const [detailOuvert, setDetailOuvert] = useState(false);
+
   const [status, setStatus] = useState("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [announcement, setAnnouncement] = useState("");
@@ -56,6 +61,7 @@ export default function Configurateur({
     peopleCount,
     mealsPerWeek,
     depositAlreadyPaid: Boolean(compte?.depositPaid),
+    freeDelivery: promo?.effect === "livraison_offerte",
   });
 
   const recettesCompletes = recipeIds.length === mealsPerWeek;
@@ -106,6 +112,7 @@ export default function Configurateur({
           slot: livraison.slot,
           firstDate: livraison.firstDate,
           contactPhone: livraison.phone?.trim(),
+          promoCode: promo?.code ?? null,
           recipeIds,
         }),
       });
@@ -123,8 +130,9 @@ export default function Configurateur({
     }
   }
 
+  // pb-4 en bas : sur mobile la barre de commande reste dans le flux
   return (
-    <div className="mx-auto max-w-5xl px-6 py-12">
+    <div className="mx-auto max-w-5xl px-6 pb-4 pt-12">
       <p className="eyebrow">Votre box sur mesure</p>
       <h1 className="font-bold mb-3 text-5xl sm:text-6xl">Composez votre box</h1>
       <p className="mb-12 max-w-xl leading-relaxed">
@@ -245,121 +253,135 @@ export default function Configurateur({
         </div>
       </Section>
 
-      {/* Récapitulatif */}
-      <div className="sticky bottom-4 mt-12 rounded-2xl bg-peche p-6 text-white shadow-lg sm:p-8">
-        <h2 className="font-bold mb-4 text-3xl text-white">Votre commande</h2>
+      {/* Code promo, juste avant le récapitulatif */}
+      <div className="mb-6">
+        <ChampCodePromo isLoggedIn={isLoggedIn} promo={promo} onChange={setPromo} />
+      </div>
 
-        <div className="grid gap-8 lg:grid-cols-2">
-          {/* Détail des montants */}
-          <div>
-            <dl className="m-0 space-y-2 text-sm">
-              <Ligne label={detail.meals.label} montant={detail.meals.amount} />
-              <Ligne label={detail.delivery.label} montant={detail.delivery.amount} />
-              {detail.deposit && (
-                <Ligne label={detail.deposit.label} montant={detail.deposit.amount} />
-              )}
-            </dl>
-
-            <div className="mt-4 border-t border-black/15 pt-4">
-              {/* À l'unité : une seule box, donc un seul montant. Les formules
-                  avec engagement affichent le premier prélèvement puis le
-                  montant hebdomadaire, qui diffèrent à cause de la consigne. */}
-              {plan === "unite" ? (
-                <p className="flex items-baseline justify-between gap-4">
-                  <span className="font-bold">Total à payer</span>
-                  <span className="text-3xl font-bold">{formatEuros(detail.firstPayment)}</span>
-                </p>
-              ) : (
-                <>
-                  <p className="flex items-baseline justify-between gap-4">
-                    <span className="font-bold">Premier prélèvement</span>
-                    <span className="text-3xl font-bold">{formatEuros(detail.firstPayment)}</span>
-                  </p>
-                  <p className="mt-1 flex items-baseline justify-between gap-4 text-sm text-ardoise">
-                    <span>Puis chaque semaine</span>
-                    <span className="font-bold">{formatEuros(detail.weekly)}</span>
-                  </p>
-                </>
-              )}
-              <p className="mt-2 text-xs text-ardoise">
-                {detail.deposit
-                  ? "La consigne des contenants n'est réglée qu'une fois : vos box vides sont échangées à chaque livraison suivante."
-                  : "Consigne déjà réglée lors d'une précédente commande, elle n'est pas refacturée."}
-              </p>
-              <p className="mt-1 text-xs font-bold text-peche">
-                soit {formatEuros(mealPrice())} le repas, livraison comprise dans le total
-              </p>
-            </div>
+      {/*
+        Récapitulatif.
+        Sur mobile il est replié : seuls le total et le bouton restent visibles,
+        car déplié il recouvrait la quasi-totalité de l'écran. Sur grand écran
+        il s'affiche en entier, sur deux colonnes.
+      */}
+      <div className="sticky bottom-0 z-20 -mx-6 mt-10 border-t border-black/10 bg-encre px-5 py-4 text-white shadow-[0_-4px_24px_rgba(34,38,31,0.18)] sm:static sm:mx-0 sm:rounded-2xl sm:border-0 sm:px-8 sm:py-7 sm:shadow-lg">
+        {/* Ligne compacte, toujours visible */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xl font-bold leading-tight sm:text-2xl">
+              {formatEuros(detail.firstPayment)}
+              <span className="ml-2 text-xs font-normal text-white/75 sm:text-sm">
+                {plan === "unite" ? "au total" : "au premier prélèvement"}
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={() => setDetailOuvert((v) => !v)}
+              aria-expanded={detailOuvert}
+              aria-controls="detail-commande"
+              className="mt-0.5 text-xs font-semibold text-white/85 underline underline-offset-2 sm:hidden"
+            >
+              {detailOuvert ? "Masquer le détail" : "Voir le détail"}
+            </button>
           </div>
 
-          {/* Ce qui a été choisi */}
-          <div>
-            <ul className="m-0 list-none space-y-2 p-0 text-sm text-ardoise">
+          <button
+            type="button"
+            onClick={payer}
+            disabled={!pret || status === "loading"}
+            aria-describedby="aide-paiement"
+            className="btn-primary shrink-0 !px-5 !py-2.5 text-sm sm:!px-7 sm:!py-3 sm:text-base"
+          >
+            {status === "loading" ? "Redirection…" : "Payer"}
+          </button>
+        </div>
+
+        {/* Détail : replié sur mobile, toujours visible à partir de sm */}
+        <div
+          id="detail-commande"
+          className={`${detailOuvert ? "block" : "hidden"} sm:block`}
+        >
+          <div className="mt-4 grid gap-6 border-t border-white/20 pt-4 lg:grid-cols-2">
+            <div>
+              <dl className="m-0 space-y-2 text-sm">
+                <Ligne label={detail.meals.label} montant={detail.meals.amount} />
+                <Ligne
+                  label={detail.delivery.label}
+                  montant={detail.delivery.amount}
+                  barre={detail.delivery.barre}
+                />
+                {detail.deposit && (
+                  <Ligne label={detail.deposit.label} montant={detail.deposit.amount} />
+                )}
+              </dl>
+
+              {plan !== "unite" && (
+                <p className="mt-3 flex items-baseline justify-between gap-4 border-t border-white/20 pt-3 text-sm">
+                  <span>Puis chaque semaine</span>
+                  <span className="font-bold">{formatEuros(detail.weekly)}</span>
+                </p>
+              )}
+
+              <p className="mt-2 text-xs text-white/75">
+                {detail.deposit
+                  ? "La consigne des contenants n'est réglée qu'une fois : vos box vides sont échangées à chaque livraison."
+                  : "Consigne déjà réglée, elle n'est pas refacturée."}
+              </p>
+            </div>
+
+            <ul className="m-0 list-none space-y-1.5 p-0 text-sm text-white/85">
               <li>
-                <span className="text-ardoise">Box :</span>{" "}
+                <span className="text-white/65">Box :</span>{" "}
                 {boxCategory ? BOX_TYPES[boxCategory].label : "à choisir"}
               </li>
               <li>
-                <span className="text-ardoise">Taille :</span> {peopleCount} personne
-                {peopleCount > 1 ? "s" : ""} · {mealsPerWeek} plats par semaine
+                <span className="text-white/65">Taille :</span> {peopleCount} personne
+                {peopleCount > 1 ? "s" : ""} · {mealsPerWeek} plats
               </li>
               <li>
-                <span className="text-ardoise">Plats :</span>{" "}
-                {recettesCompletes
-                  ? `${mealsPerWeek} choisis`
-                  : `${recipeIds.length} sur ${mealsPerWeek} choisis`}
+                <span className="text-white/65">Plats :</span>{" "}
+                {recettesCompletes ? `${mealsPerWeek} choisis` : `${recipeIds.length} / ${mealsPerWeek}`}
               </li>
               <li>
-                <span className="text-ardoise">Engagement :</span> {PLANS[plan].label}
+                <span className="text-white/65">Engagement :</span> {PLANS[plan].label}
               </li>
-              <li>
-                <span className="text-ardoise">Livraison :</span>{" "}
+              <li className="break-words">
+                <span className="text-white/65">Livraison :</span>{" "}
                 {livraison.firstDate
-                  ? `tous les ${dayLabel(livraison.weekday)}s, ${formatCreneau(livraison.slot, livraison.zone)} — première le ${formatLongDate(livraison.firstDate)}`
+                  ? `${dayLabel(livraison.weekday)}s, ${formatCreneau(livraison.slot, livraison.zone)} — 1re le ${formatLongDate(livraison.firstDate)}`
                   : "à définir"}
               </li>
-              <li>
-                <span className="text-ardoise">Adresse :</span>{" "}
+              <li className="break-words">
+                <span className="text-white/65">Adresse :</span>{" "}
                 {livraison.street?.trim()
-                  ? `${livraison.street.trim()}${livraison.notes?.trim() ? `, ${livraison.notes.trim()}` : ""}, ${livraison.postalCode} ${livraison.commune ?? ""}`
+                  ? `${livraison.street.trim()}, ${livraison.postalCode} ${livraison.commune ?? ""}`
                   : "à renseigner"}
               </li>
               <li>
-                <span className="text-ardoise">Téléphone :</span>{" "}
+                <span className="text-white/65">Téléphone :</span>{" "}
                 {livraison.phone?.trim() || "à renseigner"}
               </li>
-              <li>
-                <span className="text-ardoise">Email :</span>{" "}
+              <li className="break-words">
+                <span className="text-white/65">Email :</span>{" "}
                 {compte?.email || "celui de votre compte"}
               </li>
             </ul>
           </div>
         </div>
 
-        <div className="mt-6 border-t border-black/15 pt-5">
-          <button
-            type="button"
-            onClick={payer}
-            disabled={!pret || status === "loading"}
-            aria-describedby="aide-paiement"
-            className="btn-primary"
-          >
-            {status === "loading" ? "Redirection…" : "Passer au paiement"}
-          </button>
-          <p id="aide-paiement" className="mt-2 text-xs text-ardoise">
-            {status === "loading"
-              ? "Ouverture du paiement sécurisé Stripe."
-              : pret
-              ? isLoggedIn
-                ? "Paiement sécurisé par Stripe."
-                : "Vous devrez d'abord vous connecter."
-              : !recettesCompletes && boxCategory
-              ? `Il reste ${mealsPerWeek - recipeIds.length} plat(s) à choisir.`
-              : !livraison.phone?.trim()
-              ? "Renseignez votre téléphone pour continuer."
-              : "Complétez les étapes ci-dessus pour continuer."}
-          </p>
-        </div>
+        <p id="aide-paiement" className="mt-3 text-xs text-white/80">
+          {status === "loading"
+            ? "Ouverture du paiement sécurisé Stripe."
+            : pret
+            ? isLoggedIn
+              ? "Paiement sécurisé par Stripe."
+              : "Vous devrez d'abord vous connecter."
+            : !recettesCompletes && boxCategory
+            ? `Il reste ${mealsPerWeek - recipeIds.length} plat(s) à choisir.`
+            : !livraison.phone?.trim()
+            ? "Renseignez votre téléphone pour continuer."
+            : "Complétez les étapes ci-dessus pour continuer."}
+        </p>
       </div>
 
       {status === "error" && (
@@ -371,11 +393,18 @@ export default function Configurateur({
   );
 }
 
-function Ligne({ label, montant }) {
+function Ligne({ label, montant, barre = null }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-ardoise">{label}</dt>
-      <dd className="m-0 font-bold">{formatEuros(montant)}</dd>
+      <dt className="text-white/85">{label}</dt>
+      <dd className="m-0 shrink-0 font-bold">
+        {barre !== null && (
+          <span className="mr-2 font-normal text-white/60 line-through">
+            {formatEuros(barre)}
+          </span>
+        )}
+        {formatEuros(montant)}
+      </dd>
     </div>
   );
 }

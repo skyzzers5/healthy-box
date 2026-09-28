@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { validerCodePromo } from "@/lib/promo";
 import { stripe } from "@/lib/stripe";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import {
@@ -32,7 +33,7 @@ export async function POST(request) {
     const {
       boxCategory, plan, peopleCount, mealsPerWeek,
       postalCode, street, notes, weekday, slot, firstDate, recipeIds,
-      contactPhone,
+      contactPhone, promoCode,
     } = body;
 
     // 2. On revalide TOUT côté serveur. Le navigateur n'envoie jamais de prix :
@@ -155,6 +156,16 @@ export async function POST(request) {
 
     const consigneDejaPayee = (abonnementsPasses?.length ?? 0) > 0;
 
+    // 6 quater. Code promo : revalidé ici, jamais pris au mot depuis le
+    //           navigateur. Un code invalide n'est pas une erreur bloquante,
+    //           on poursuit simplement au tarif normal.
+    let promo = null;
+    if (promoCode) {
+      const verif = await validerCodePromo(promoCode, user.id);
+      if (verif.ok) promo = verif.promo;
+    }
+    const livraisonOfferte = promo?.effect === "livraison_offerte";
+
     // 7. Enregistrement de l'adresse.
     const { data: address, error: addrError } = await admin
       .from("delivery_addresses")
@@ -171,7 +182,11 @@ export async function POST(request) {
     if (addrError) throw addrError;
 
     // 8. Abonnement en attente : il ne deviendra actif que via le webhook.
-    const amountInCents = weeklyPriceInCents({ boxCategory, plan, peopleCount, mealsPerWeek });
+    const amountInCents = weeklyPriceInCents({
+      peopleCount,
+      mealsPerWeek,
+      freeDelivery: livraisonOfferte,
+    });
 
     const commitmentMonths = PLANS[plan].months;
     const commitmentEndsAt =
@@ -195,6 +210,8 @@ export async function POST(request) {
         contact_email: email,
         contact_phone: telephone,
         deposit_amount_cents: consigneDejaPayee ? 0 : depositInCents(),
+        promo_code_id: promo?.id ?? null,
+        free_delivery: livraisonOfferte,
         status: "incomplete",
         commitment_ends_at: commitmentEndsAt,
       })
@@ -219,7 +236,7 @@ export async function POST(request) {
             product_data: {
               // BOX_TYPES[].label vaut déjà "Box diabète" / "Box anti-inflammatoire"
               name: `Healthy Box — ${BOX_TYPES[boxCategory].label}`,
-              description: `${mealsPerWeek} plats par semaine pour ${peopleCount} personne(s), livraison comprise — tous les ${dayLabel(jour)}s, ${formatCreneau(creneau, zone)}`,
+              description: `${mealsPerWeek} plats par semaine pour ${peopleCount} personne(s)${livraisonOfferte ? ", livraison offerte" : ", livraison comprise"} — tous les ${dayLabel(jour)}s, ${formatCreneau(creneau, zone)}`,
             },
           },
         },
@@ -260,6 +277,17 @@ export async function POST(request) {
       cancel_url: `${siteUrl}/formules?paiement=annule`,
       locale: "fr",
     });
+
+    // On enregistre l'utilisation maintenant : cela réserve le code pour
+    // cette personne. Si le paiement échoue, la ligne reste mais l'abonnement
+    // n'est jamais activé — un ménage périodique peut la supprimer.
+    if (promo) {
+      await admin.from("promo_redemptions").insert({
+        promo_code_id: promo.id,
+        user_id: user.id,
+        subscription_id: subscription.id,
+      });
+    }
 
     return NextResponse.json({ url: session.url });
   } catch (error) {

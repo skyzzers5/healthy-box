@@ -85,7 +85,7 @@ export default function EtapeRecettes({
   return (
     <div>
       {/* Compteur collant : reste visible pendant qu'on fait défiler la liste */}
-      <div className="sticky top-20 z-10 mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-black/10 bg-white px-4 py-3">
+      <div className="sticky top-[72px] z-10 mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-black/10 bg-white px-4 py-3 sm:top-20">
         <p className="font-bold text-encre" aria-live="polite">
           {total} plat{total > 1 ? "s" : ""} sur {mealsPerWeek} sélectionné{total > 1 ? "s" : ""}
         </p>

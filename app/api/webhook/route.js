@@ -38,7 +38,7 @@ export async function POST(request) {
         // On relit l'abonnement pour récupérer la sélection de recettes.
         const { data: abonnement } = await admin
           .from("subscriptions")
-          .select("recipe_ids, deposit_amount_cents, contact_phone")
+          .select("recipe_ids, deposit_amount_cents, contact_phone, promo_code_id")
           .eq("id", Number(subId))
           .single();
 
@@ -55,6 +55,12 @@ export async function POST(request) {
             deposit_paid: (abonnement?.deposit_amount_cents ?? 0) > 0,
           })
           .eq("id", Number(subId));
+
+        // Le compteur d'utilisations du code n'est incrémenté qu'ici :
+        // un panier abandonné ne doit pas consommer le quota.
+        if (abonnement?.promo_code_id) {
+          await admin.rpc("increment_promo_usage", { promo_id: abonnement.promo_code_id });
+        }
 
         // On garde le téléphone au profil, pour les commandes suivantes.
         if (userId && abonnement?.contact_phone) {

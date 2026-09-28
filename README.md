@@ -187,6 +187,68 @@ Tout se passe dans la table `delivery_zones` :
 
 ---
 
+## Back-office
+
+Accessible sur `/admin`, réservé aux comptes ayant le rôle `admin`.
+
+### Se nommer administrateur
+
+Le rôle ne peut pas être modifié depuis le site : une politique SQL
+l'interdit explicitement, sinon n'importe quel client pourrait se promouvoir.
+Cela se fait uniquement depuis l'éditeur SQL de Supabase :
+
+```sql
+update profiles set role = 'admin'
+where id = (select id from auth.users where email = 'vous@exemple.fr');
+```
+
+### Ce qu'on y trouve
+
+| Page | Usage |
+|---|---|
+| Tableau de bord | abonnements actifs, chiffre hebdomadaire, livraisons de la semaine, communes demandées hors zone |
+| Livraisons | feuille de tournée d'une date, groupée par zone et triée par créneau, imprimable |
+| Liste de courses | ingrédients agrégés pour une date, en portions |
+| Abonnements | tous les abonnements, filtrables par statut |
+| Recettes | création et modification, sans passer par SQL |
+| Paniers abandonnés | commandes non finalisées, avec relance par email |
+
+La feuille de tournée et la liste de courses s'impriment directement
+(bouton *Imprimer*) : c'est ce qui sert sur le terrain.
+
+### Ajouter une recette
+
+Passez par **Admin → Recettes → Ajouter**. Le formulaire écrit la recette et
+ses **deux** variantes d'un coup, ce qui évite les recettes qui n'existeraient
+que dans une box. Pour la photo, déposez d'abord le fichier dans
+`public/images/recettes/` puis indiquez son chemin.
+
+Une recette ne peut pas être publiée sans le nom de la personne qui l'a
+validée : c'est imposé à la fois par le formulaire et par une contrainte SQL.
+
+On ne supprime jamais une recette, on la dépublie : des commandes passées y
+font référence.
+
+---
+
+## Relance de panier abandonné
+
+Un abonnement reste au statut `incomplete` quand la personne a tout configuré
+sans payer. La page **Paniers abandonnés** les liste et permet d'envoyer une
+relance en un clic.
+
+L'envoi passe par **Resend**. Sans `RESEND_API_KEY` et `EMAIL_EXPEDITEUR`, le
+bouton renvoie un message explicite au lieu de faire croire à un envoi réussi.
+
+Pour configurer : créer un compte sur resend.com, vérifier votre domaine
+d'envoi (sans quoi les emails partent en indésirables), générer une clé API,
+et renseigner les deux variables en local et sur Vercel.
+
+La relance est **manuelle** pour l'instant. L'automatiser demande une tâche
+planifiée — à faire une fois que vous aurez constaté le volume réel.
+
+---
+
 ## Rendez-vous : Calendly
 
 L'agenda de la naturopathe est géré par Calendly, pas par cette application :

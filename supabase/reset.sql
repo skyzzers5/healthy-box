@@ -9,6 +9,8 @@
 -- Pour repartir de zéro côté comptes : Authentication > Users, à la main.
 -- =====================================================================
 
+drop table if exists promo_redemptions cascade;
+drop table if exists promo_codes       cascade;
 drop table if exists waitlist          cascade;
 drop table if exists appointments      cascade;
 drop table if exists orders            cascade;
@@ -20,10 +22,12 @@ drop table if exists recipe_variants   cascade;
 drop table if exists recipes           cascade;
 drop table if exists profiles          cascade;
 
-drop type if exists appointment_status  cascade;
+drop type if exists promo_effect        cascade;
 drop type if exists order_status        cascade;
 drop type if exists plan_kind           cascade;
 drop type if exists subscription_status cascade;
+drop type if exists user_role           cascade;
 drop type if exists box_category        cascade;
 
+drop function if exists increment_promo_usage(bigint) cascade;
 drop function if exists handle_new_user() cascade;
