@@ -29,11 +29,23 @@ export default async function RootLayout({ children }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Le rôle sert uniquement à afficher le lien d'administration : l'accès
+  // réel est vérifié par le proxy et par chaque page /admin.
+  let estAdmin = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    estAdmin = profile?.role === "admin";
+  }
+
   return (
     <html lang="fr" className={`${dmSans.variable} ${caveat.variable}`}>
       <body>
         <a href="#contenu" className="sr-only-focusable">Aller au contenu principal</a>
-        <Nav isLoggedIn={Boolean(user)} />
+        <Nav isLoggedIn={Boolean(user)} estAdmin={estAdmin} />
         <main id="contenu" tabIndex={-1}>{children}</main>
         <Footer />
       </body>

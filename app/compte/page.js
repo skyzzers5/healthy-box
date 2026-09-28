@@ -49,7 +49,7 @@ export default async function ComptePage({ searchParams }) {
 
   const [{ data: profile }, { data: subscriptions }, { data: orders }, { data: recipes }] =
     await Promise.all([
-      supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+      supabase.from("profiles").select("full_name, role").eq("id", user.id).maybeSingle(),
       supabase
         .from("subscriptions")
         .select("*, delivery_addresses(street, postal_code, delivery_zones(city, allowed_days, slot_start, slot_end, slot_interval_minutes, lead_time_days, cutoff_time))")
@@ -235,6 +235,21 @@ export default async function ComptePage({ searchParams }) {
         </div>
 
         <div className="space-y-6">
+          {/* Raccourci vers le back-office. Affiché seulement aux comptes
+              administrateurs — le rôle est vérifié côté serveur, et /admin
+              revérifie de son côté : masquer un lien ne protège rien. */}
+          {profile?.role === "admin" && (
+            <section className="carte border-2 border-framboise p-6" aria-labelledby="admin">
+              <h2 id="admin" className="mb-2 text-xl">Administration</h2>
+              <p className="mb-4 text-sm text-ardoise">
+                Tournées du jour, liste de courses, abonnements et recettes.
+              </p>
+              <Link href="/admin" className="btn-primary w-full text-sm">
+                Ouvrir le back-office
+              </Link>
+            </section>
+          )}
+
           {current && current.stripe_subscription_id && <GestionAbonnement subscription={current} />}
           <section className="carte p-6">
             <h2 className="sr-only">Compte</h2>

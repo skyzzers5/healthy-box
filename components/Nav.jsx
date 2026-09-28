@@ -10,9 +10,13 @@ const LINKS = [
   { href: "/rdv", label: "Naturopathe" },
 ];
 
-export default function Nav({ isLoggedIn }) {
+export default function Nav({ isLoggedIn, estAdmin = false }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  // Le lien n'apparaît que pour les administrateurs, mais le masquer ne
+  // protège rien : /admin refuse l'accès de toute façon.
+  const liens = estAdmin ? [...LINKS, { href: "/admin", label: "Admin" }] : LINKS;
 
   return (
     <nav aria-label="Navigation principale" className="sticky top-0 z-50 border-b border-black/5 bg-white">
@@ -25,7 +29,7 @@ export default function Nav({ isLoggedIn }) {
         </Link>
 
         <div className="hidden items-center gap-8 lg:flex">
-          {LINKS.map((link) => (
+          {liens.map((link) => (
             <Link
               key={link.href}
               href={link.href}
@@ -66,7 +70,7 @@ export default function Nav({ isLoggedIn }) {
 
       {open && (
         <div id="menu-mobile" className="border-t border-black/5 px-6 py-3 lg:hidden">
-          {LINKS.concat([{ href: "/compte", label: "Mon compte" }]).map((link) => (
+          {liens.concat([{ href: "/compte", label: "Mon compte" }]).map((link) => (
             <Link key={link.href} href={link.href} onClick={() => setOpen(false)} className="block py-2.5 font-semibold text-encre">
               {link.label}
             </Link>
